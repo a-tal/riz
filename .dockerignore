@@ -1,0 +1,6 @@
+.gitignore
+/target/!x86_64-unknown-linux-musl
+/data
+Dockerfile
+*.json
+*.sh
