@@ -4,7 +4,7 @@
 
 [![crate-badge]][crate] [![docs-badge]][docs] ![min-rust] ![lic-badge]
 <br />
-[![downloads-badge]][crate] [![ci-badge]][ci] [![docker-badge]][docker] [![size-badge]][docker]
+[![ci-badge]][ci] [![downloads-badge]][crate] [![docker-badge]][docker] [![size-badge]][docker]
 <br />
 [![sec-badge]][sec] [![dep-badge]][dep] [![codecov][cov-badge]][cov]
 
@@ -73,7 +73,6 @@ Options:
   -h, --help                     Print help
   -V, --version                  Print version
 ```
-
 
 [min-rust]: https://img.shields.io/badge/rustc-1.68+-ab6000.svg
 [lic-badge]: https://img.shields.io/crates/l/actix-web.svg
