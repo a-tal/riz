@@ -1,6 +1,14 @@
-# Riz
+<div align="center">
+<h1>Riz</h1>
+<p><i>Rust API (and CLI) for controlling Wiz lights</i></p>
 
-Rust API (and CLI) for controlling Wiz lights.
+[![crate-badge]][crate] [![docs-badge]][docs] ![min-rust] ![lic-badge]
+<br />
+[![downloads-badge]][crate] [![ci-badge]][ci] [![docker-badge]][docker] [![size-badge]][docker]
+<br />
+[![sec-badge]][sec] [![dep-badge]][dep] [![codecov][cov-badge]][cov]
+
+</div>
 
 ## UI
 
@@ -65,3 +73,23 @@ Options:
   -h, --help                     Print help
   -V, --version                  Print version
 ```
+
+
+[min-rust]: https://img.shields.io/badge/rustc-1.68+-ab6000.svg
+[lic-badge]: https://img.shields.io/crates/l/actix-web.svg
+[crate-badge]: https://img.shields.io/crates/v/riz.svg?label=latest
+[crate]: https://crates.io/crates/riz
+[docs-badge]: https://docs.rs/riz/badge.svg
+[docs]: https://docs.rs/riz
+[ci-badge]: https://github.com/a-tal/riz/actions/workflows/rust.yml/badge.svg
+[ci]: https://github.com/a-tal/riz/actions/workflows/rust.yml
+[sec-badge]: https://github.com/a-tal/riz/actions/workflows/security.yml/badge.svg
+[sec]: https://github.com/a-tal/riz/actions/workflows/security.yml
+[docker-badge]: https://ghcr-badge.deta.dev/a-tal/riz/latest_tag?trim=major&label=ghcr.io
+[size-badge]: https://ghcr-badge.deta.dev/a-tal/riz/size?tag=master
+[docker]: https://github.com/a-tal/riz/pkgs/container/riz
+[dep-badge]: https://deps.rs/crate/riz/latest/status.svg
+[dep]: https://deps.rs/crate/riz/
+[downloads-badge]: https://img.shields.io/crates/d/riz.svg
+[cov-badge]: https://codecov.io/gh/a-tal/riz/branch/master/graph/badge.svg
+[cov]: https://codecov.io/gh/a-tal/riz
