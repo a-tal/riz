@@ -1,6 +1,6 @@
 [package]
 name = "riz"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Adam Talsma <adam@talsma.ca>"]
 description = "Wiz lights API and CLI"
 keywords = ["wiz", "lights", "iot"]

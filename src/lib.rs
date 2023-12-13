@@ -1,47 +1,5 @@
 //! Riz - Wiz Light Control Library
 //!
-//! # Examples
-//!
-//! ```
-//! use std::net::Ipv4Addr;
-//! use std::str::FromStr;
-//! use riz::models::{Light, Payload, LightingResponse, Color, LastSet, SceneMode};
-//!
-//! let light = Light::new(Ipv4Addr::from_str("192.168.1.91").unwrap(), None);
-//!
-//! // set does not require mutability
-//! let resp = light.set(&Payload::from(&Color::from_str("255,0,0").unwrap())).unwrap();
-//!
-//! // updating the light's status (and rooms.json) requires mutability
-//! let mut light = light;
-//! assert!(light.process_reply(&resp));
-//!
-//! // after we have called .process_reply() the light's status is correct
-//! let status = light.status().unwrap();
-//! assert_eq!(status.last().unwrap(), &LastSet::Color);
-//!
-//! // status will have all the last set values it knows about
-//! let color = status.color().unwrap();
-//! assert_eq!(color.red(), 255);
-//! assert_eq!(color.green(), 0);
-//! assert_eq!(color.blue(), 0);
-//!
-//! // for example, if we switch to a scene now, the color
-//! // values will remain. use status.last to determine context
-//! let resp = light.set(&Payload::from(&SceneMode::Focus)).unwrap();
-//! assert!(light.process_reply(&resp));
-//!
-//! let status = light.status().unwrap();
-//! assert_eq!(status.last().unwrap(), &LastSet::Scene);
-//!
-//! assert_eq!(status.scene().unwrap(), &SceneMode::Focus);
-//!
-//! let color = status.color().unwrap();
-//! assert_eq!(color.red(), 255);
-//! assert_eq!(color.green(), 0);
-//! assert_eq!(color.blue(), 0);
-//! ```
-//!
 //! # API
 //!
 //! Note that all Riz API routes are also documented in OpenAPI spec.

@@ -74,15 +74,13 @@ fn print_scenes() {
 }
 
 fn print_response(res: Result<LightingResponse, Box<dyn Error>>) {
-    match res {
-        Err(e) => eprintln!("Error: {:?}", e),
-        _ => {}
-    };
+    if let Err(e) = res {
+        eprintln!("Error: {:?}", e);
+    }
 }
 
 fn modify_light(args: &Args, light: Light) {
     if args.status {
-        let light = light;
         match light.get_status() {
             Ok(status) => println!("{}", serde_json::to_string_pretty(&status).unwrap()),
             Err(e) => eprintln!("Failed to get bulb status: {:?}", e),

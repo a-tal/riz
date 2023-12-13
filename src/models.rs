@@ -166,10 +166,7 @@ impl Room {
     /// ```
     ///
     pub fn list(&self) -> Option<Vec<&Uuid>> {
-        match &self.lights {
-            Some(lights) => Some(lights.keys().collect()),
-            None => None,
-        }
+        self.lights.as_ref().map(|lights| lights.keys().collect())
     }
 
     /// Read a light in this room by ID
@@ -215,7 +212,7 @@ impl Room {
 
     /// Accessor for this room's name
     pub fn name(&self) -> &str {
-        return &self.name;
+        &self.name
     }
 
     /// Update our (non-light) attributes from the other instance
@@ -236,7 +233,7 @@ impl Room {
             return false;
         }
         self.name = other.name.clone();
-        return true;
+        true
     }
 }
 
@@ -278,21 +275,14 @@ impl Light {
     pub fn new(ip: Ipv4Addr, name: Option<&str>) -> Self {
         Light {
             ip,
-            name: match name {
-                Some(s) => Some(String::from(s)),
-                None => None,
-            },
+            name: name.map(String::from),
             status: None,
         }
     }
 
-    /// Create a clone of this light's ip address
-    ///
-    /// # Returns
-    ///   [Ipv4Addr] for this light
-    ///
+    /// Accessor for this bulb's IP address
     pub fn ip(&self) -> Ipv4Addr {
-        return self.ip.clone();
+        self.ip
     }
 
     /// Accessor for this bulb's name
@@ -313,26 +303,8 @@ impl Light {
     /// Note that this is not the same as accessing the last known
     /// status for the bulb, this method sends a new request for data,
     ///
-    /// You can use the response from this function to update the last
-    /// known status if you want. Or just display the fetched status.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::net::Ipv4Addr;
-    /// use std::str::FromStr;
-    ///
-    /// use riz::models::{Light, LightingResponse};
-    ///
-    /// let light = Light::new(Ipv4Addr::from_str("192.168.1.91").unwrap(), None);
-    ///
-    /// let status = light.get_status().unwrap();
-    /// assert!(light.status().is_none());
-    ///
-    /// let mut light = light;
-    /// assert!(light.process_reply(&LightingResponse::status(light.ip(), status)));
-    /// assert!(light.status().is_some());
-    /// ```
+    /// If you want to update the last known state, you can pass the
+    /// newly fetched status into [Self::process_reply]
     ///
     pub fn get_status(&self) -> Result<LightStatus, Box<dyn Error>> {
         let resp = self.udp_response(&json!({"method": "getPilot"}))?;
@@ -344,32 +316,7 @@ impl Light {
     /// Set new lighting settings on this bulb
     ///
     /// Does not update self.status, you can pass the response back
-    /// into process_reply if you want to update the internal state
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::net::Ipv4Addr;
-    /// use std::str::FromStr;
-    /// use riz::models::{Light, Payload, Color, LastSet};
-    ///
-    /// let payload = Payload::from(&Color::from_str("0,255,0").unwrap());
-    /// let light = Light::new(Ipv4Addr::from_str("192.168.1.91").unwrap(), None);
-    ///
-    /// let resp = light.set(&payload).unwrap();
-    /// assert!(light.status().is_none());
-    ///
-    /// let mut light = light;
-    /// light.process_reply(&resp);
-    ///
-    /// let status = light.status().unwrap();
-    /// assert_eq!(status.last().unwrap(), &LastSet::Color);
-    ///
-    /// let color = status.color().unwrap();
-    /// assert_eq!(color.red(), 0);
-    /// assert_eq!(color.green(), 255);
-    /// assert_eq!(color.blue(), 0);
-    /// ```
+    /// into [Self::process_reply] if you want to update the internal state
     ///
     pub fn set(&self, payload: &Payload) -> SetResponse {
         if payload.is_valid() {
@@ -403,24 +350,6 @@ impl Light {
     /// mutate internal state. You can pass the response from this method
     /// to [Self::process_reply] if you want to update this bulb's status
     ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::net::Ipv4Addr;
-    /// use std::str::FromStr;
-    /// use riz::models::{Light, PowerMode, LastSet};
-    ///
-    /// let light = Light::new(Ipv4Addr::from_str("192.168.1.91").unwrap(), None);
-    ///
-    /// let resp = light.set_power(&PowerMode::On).unwrap();
-    /// assert!(light.status().is_none());
-    ///
-    /// let mut light = light;
-    /// light.process_reply(&resp);
-    ///
-    /// assert!(light.status().unwrap().emitting());
-    /// ```
-    ///
     pub fn set_power(&self, power: &PowerMode) -> SetResponse {
         match power {
             PowerMode::On => self.toggle_power(true),
@@ -452,14 +381,14 @@ impl Light {
         }
 
         if self.ip != other.ip {
-            self.ip = other.ip.clone();
+            self.ip = other.ip;
             any_update = true;
         }
 
         any_update
     }
 
-    /// Called after any set command to update the internal state
+    /// Update the internal state with the response of some command
     pub fn process_reply(&mut self, resp: &LightingResponse) -> bool {
         if resp.ip == self.ip {
             match &resp.response {
@@ -491,7 +420,7 @@ impl Light {
 
     fn update_status_from_power(&mut self, power: &PowerMode) {
         if let Some(status) = &mut self.status {
-            status.update_from_power(&power);
+            status.update_from_power(power);
         } else {
             self.status = Some(LightStatus::from(power));
         }
@@ -530,7 +459,7 @@ impl Light {
 }
 
 /// Brightness can be applied in any context, values from 10 to 100
-#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct Brightness {
     #[schema(minimum = 10, maximum = 100)]
     value: u8,
@@ -602,12 +531,12 @@ impl Brightness {
 
     /// Check if the value is within the valid range
     fn valid(value: u8) -> bool {
-        10 <= value && value <= 100
+        (10..=100).contains(&value)
     }
 }
 
 /// Speed can be applied to select scenes only, values from 20 to 200
-#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct Speed {
     #[schema(minimum = 20, maximum = 200)]
     value: u8,
@@ -678,12 +607,12 @@ impl Speed {
     }
 
     fn valid(value: u8) -> bool {
-        20 <= value && value <= 200
+        (20..=200).contains(&value)
     }
 }
 
 /// Kelvin sets a temperature mode, values from 1000 to 8000
-#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct Kelvin {
     #[schema(minimum = 1000, maximum = 8000)]
     kelvin: u16,
@@ -726,7 +655,7 @@ impl Kelvin {
     /// ```
     ///
     pub fn create(kelvin: u16) -> Option<Self> {
-        if kelvin >= 1000 && kelvin <= 8000 {
+        if (1000..=8000).contains(&kelvin) {
             Some(Kelvin { kelvin })
         } else {
             None
@@ -735,7 +664,7 @@ impl Kelvin {
 }
 
 /// White describes a cool or warm white mode, values from 1 to 100
-#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct White {
     #[schema(minimum = 1, maximum = 100)]
     value: u8,
@@ -764,7 +693,7 @@ impl White {
     /// ```
     ///
     pub fn create(value: u8) -> Option<Self> {
-        if 1 <= value && value <= 100 {
+        if (1..=100).contains(&value) {
             Some(White { value })
         } else {
             None
@@ -773,7 +702,7 @@ impl White {
 }
 
 /// Color is any RGB color, values from 0 to 255
-#[derive(Debug, Serialize, Deserialize, Clone, ToSchema, PartialEq)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone, ToSchema, PartialEq)]
 pub struct Color {
     #[schema(maximum = 255)]
     red: u8,
@@ -845,10 +774,7 @@ impl FromStr for Color {
     /// ```
     ///
     fn from_str(s: &str) -> Result<Self, String> {
-        let parts: Vec<_> = s
-            .split(",")
-            .map(|c| u8::from_str_radix(c, 10).unwrap_or(0))
-            .collect();
+        let parts: Vec<_> = s.split(',').map(|c| c.parse::<u8>().unwrap_or(0)).collect();
 
         if parts.len() == 3 {
             Ok(Color {
@@ -857,7 +783,7 @@ impl FromStr for Color {
                 blue: parts[2],
             })
         } else {
-            Err(format!("Invalid color string"))
+            Err("Invalid color string".to_string())
         }
     }
 }
@@ -956,12 +882,7 @@ pub enum SceneMode {
 impl SceneMode {
     pub fn create(value: u8) -> Option<Self> {
         // this is suboptimal...
-        for scene in SceneMode::iter() {
-            if scene.clone() as u8 == value {
-                return Some(scene);
-            }
-        }
-        None
+        SceneMode::iter().find(|scene| scene.clone() as u8 == value)
     }
 }
 
@@ -1233,10 +1154,7 @@ impl From<&PowerMode> for LightStatus {
         LightStatus {
             color: None,
             brightness: None,
-            emitting: match power {
-                PowerMode::Off => false,
-                _ => true,
-            },
+            emitting: !matches!(power, PowerMode::Off),
             scene: None,
             speed: None,
             temp: None,
@@ -1389,7 +1307,7 @@ pub enum LightingResponseType {
 /// it with the helper methods.
 ///
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct Payload {
     #[serde(rename = "sceneId")]
     scene: Option<u8>,
@@ -1522,15 +1440,16 @@ impl Payload {
     /// ```
     /// use std::net::Ipv4Addr;
     /// use std::str::FromStr;
-    /// use riz::models::{Light, Payload, LastSet, Color, Speed};
+    /// use riz::models::{Light, Payload, LastSet, Color, Speed, LightingResponse};
     ///
-    /// let mut light = Light::new(Ipv4Addr::from_str("192.168.1.91").unwrap(), None);
+    /// let ip = Ipv4Addr::from_str("10.1.2.3").unwrap();
+    /// let mut light = Light::new(ip, None);
     ///
     /// let mut payload = Payload::new();
     /// payload.speed(&Speed::create(100).unwrap());
     /// payload.color(&Color::from_str("0,0,255").unwrap());
     ///
-    /// let resp = light.set(&payload).unwrap();
+    /// let resp = LightingResponse::payload(ip, payload);
     /// assert!(light.process_reply(&resp));
     ///
     /// let status = light.status().unwrap();

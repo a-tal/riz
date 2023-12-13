@@ -22,6 +22,7 @@ use crate::models::{Light, LightingResponse, Room};
 /// let storage = Data::new(Mutex::new(Storage::new()));
 /// ```
 ///
+#[derive(Default, Debug)]
 pub struct Storage {
     rooms: HashMap<Uuid, Room>,
     file_path: String,
@@ -64,9 +65,8 @@ impl Storage {
     /// Write the contents of self.rooms to rooms.json
     fn write(&self) {
         if let Ok(contents) = serde_json::to_string(&self.rooms) {
-            match fs::write(&self.file_path, contents) {
-                Err(e) => error!("Failed to write JSON: {:?}", e),
-                _ => {}
+            if let Err(e) = fs::write(&self.file_path, contents) {
+                error!("Failed to write JSON: {:?}", e);
             }
         } else {
             error!("Failed to dump JSON");
@@ -97,10 +97,7 @@ impl Storage {
 
     /// Read a room by ID (returns clone)
     pub fn read(&self, room: &Uuid) -> Option<Room> {
-        match self.rooms.get(room) {
-            Some(room) => Some(room.clone()),
-            None => None,
-        }
+        self.rooms.get(room).cloned()
     }
 
     /// Updates non-light attributes (currently just name)
@@ -165,7 +162,7 @@ impl Storage {
     pub fn process_reply(&mut self, resp: &LightingResponse) {
         let mut any_update = false;
         for room in self.rooms.values_mut() {
-            let room_update = room.process_reply(&resp);
+            let room_update = room.process_reply(resp);
             any_update = any_update || room_update;
         }
 

@@ -10,7 +10,7 @@ use riz::{health, lights, models, rooms, Storage, Worker};
 
 fn get_port() -> u16 {
     let port = env::var("RIZ_PORT").unwrap_or(String::from("8080"));
-    match u16::from_str_radix(&port, 10) {
+    match port.parse::<u16>() {
         Ok(v) => v,
         Err(e) => {
             log::error!("Invalid port: {port}: {:?}", e);

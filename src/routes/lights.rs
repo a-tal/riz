@@ -102,8 +102,8 @@ async fn update_room(
         let mut worker = worker.lock().unwrap();
         for light_id in lights {
             if let Some(light) = room.read(light_id) {
-                if let Err(_) = worker.create_task(light.ip(), req.clone()) {
-                    return Err(ErrorServiceUnavailable(format!("No available workers")));
+                if worker.create_task(light.ip(), req.clone()).is_err() {
+                    return Err(ErrorServiceUnavailable("No available workers".to_string()));
                 }
             }
         }
@@ -160,7 +160,7 @@ async fn update(
         let mut worker = worker.lock().unwrap();
         match worker.create_task(light.ip(), req) {
             Ok(_) => Ok(HttpResponse::Ok()),
-            Err(_) => Err(ErrorServiceUnavailable(format!("No available workers"))),
+            Err(_) => Err(ErrorServiceUnavailable("No available workers".to_string())),
         }
     } else {
         Err(ErrorNotFound(format!("No such light: {}", light_id)))
@@ -208,10 +208,11 @@ async fn status(
         match light.get_status() {
             Ok(status) => {
                 let mut worker = worker.lock().unwrap();
-                match worker.queue_update(LightingResponse::status(light.ip(), status.clone())) {
-                    Err(e) => error!("Failed to queue write: {}", e),
-                    _ => {}
-                };
+                if let Err(e) =
+                    worker.queue_update(LightingResponse::status(light.ip(), status.clone()))
+                {
+                    error!("Failed to queue write: {}", e);
+                }
                 Ok(HttpResponse::Ok().json(status))
             }
             Err(e) => Err(ErrorServiceUnavailable(format!(
@@ -257,7 +258,7 @@ async fn update_light(
     let light = light.into_inner();
 
     let mut data = storage.lock().unwrap();
-    if let Ok(_) = data.update_light(&room_id, &light_id, &light) {
+    if data.update_light(&room_id, &light_id, &light).is_ok() {
         Ok(HttpResponse::Ok())
     } else {
         Err(ErrorNotFound(format!("Not found: {}", room_id)))
@@ -287,7 +288,7 @@ async fn update_light(
 async fn destroy(ids: Path<(Uuid, Uuid)>, storage: Data<Mutex<Storage>>) -> Result<impl Responder> {
     let (room_id, light_id) = ids.into_inner();
     let mut data = storage.lock().unwrap();
-    if let Ok(_) = data.delete_light(&room_id, &light_id) {
+    if data.delete_light(&room_id, &light_id).is_ok() {
         Ok(HttpResponse::Ok())
     } else {
         Err(ErrorNotFound(format!(

@@ -33,10 +33,9 @@ pub struct Worker {
 fn send_reply(resp: Result<LightingResponse, Box<dyn Error>>, tx: Sender<ReplyMessage>) {
     match resp {
         Ok(resp) => {
-            match tx.send(ReplyMessage::Reply(resp)) {
-                Err(e) => error!("Failed to sync response: {:?}", e),
-                _ => {}
-            };
+            if let Err(e) = tx.send(ReplyMessage::Reply(resp)) {
+                error!("Failed to sync response: {:?}", e);
+            }
         }
         Err(e) => {
             error!("Lighting error: {}", e);
@@ -129,10 +128,9 @@ impl Worker {
 impl Drop for Worker {
     fn drop(&mut self) {
         info!("shutting down dispatch");
-        match self.tx.send(DispatchMessage::Shutdown) {
-            Err(e) => error!("Failed to send dispatch shutdown: {}", e),
-            _ => {}
-        };
+        if let Err(e) = self.tx.send(DispatchMessage::Shutdown) {
+            error!("Failed to send dispatch shutdown: {}", e);
+        }
 
         if let Some(thread) = self.thread.take() {
             thread.join().unwrap_or_else(|_| {
@@ -140,10 +138,9 @@ impl Drop for Worker {
             });
         }
 
-        match self.reply_tx.send(ReplyMessage::Shutdown) {
-            Err(e) => error!("Failed to send response listener shutdown: {}", e),
-            _ => {}
-        };
+        if let Err(e) = self.reply_tx.send(ReplyMessage::Shutdown) {
+            error!("Failed to send response listener shutdown: {}", e);
+        }
 
         if let Some(thread) = self.reply_thread.take() {
             thread.join().unwrap_or_else(|_| {

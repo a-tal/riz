@@ -66,7 +66,7 @@ async fn create(req: Json<Room>, storage: Data<Mutex<Storage>>) -> Result<impl R
 async fn destroy(id: Path<Uuid>, storage: Data<Mutex<Storage>>) -> Result<impl Responder> {
     let id = id.into_inner();
     let mut data = storage.lock().unwrap();
-    if let Ok(_) = data.delete_room(&id) {
+    if data.delete_room(&id).is_ok() {
         Ok(HttpResponse::Ok())
     } else {
         Err(ErrorNotFound(format!("Not found: {}", id)))
@@ -160,7 +160,7 @@ async fn update(
     let room = req.into_inner();
 
     let mut data = storage.lock().unwrap();
-    if let Ok(_) = data.update_room(&id, &room) {
+    if data.update_room(&id, &room).is_ok() {
         Ok(HttpResponse::Ok())
     } else {
         Err(ErrorNotFound(format!("Not found: {}", id)))
@@ -208,10 +208,9 @@ async fn status(
             let mut worker = worker.lock().unwrap();
 
             for resp in responses {
-                match worker.queue_update(resp) {
-                    Err(e) => error!("Failed to queue write: {}", e),
-                    _ => {}
-                };
+                if let Err(e) = worker.queue_update(resp) {
+                    error!("Failed to queue write: {}", e);
+                }
             }
 
             Ok(HttpResponse::Ok().json(room))

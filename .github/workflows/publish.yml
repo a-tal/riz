@@ -1,0 +1,28 @@
+name: publish
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  publish-crate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            override: true
+
+      - uses: katyo/publish-crates@5ea6cad5f1202323f7c7da183018fe8c79b86be4
+        id: publish-crates
+        with:
+            registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: if crate published
+            if: fromJSON(steps.publish-crates.outputs.published).*
+            run: |
+              LIST="${{ join(fromJSON(steps.publish-crates.outputs.published).*.name, ', ')) }}"
+              echo "Published crates: $LIST"
