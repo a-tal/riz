@@ -75,7 +75,7 @@ Options:
 ```
 
 [min-rust]: https://img.shields.io/badge/rustc-1.68+-ab6000.svg
-[lic-badge]: https://img.shields.io/crates/l/actix-web.svg
+[lic-badge]: https://img.shields.io/crates/l/riz.svg
 [crate-badge]: https://img.shields.io/crates/v/riz.svg?label=latest
 [crate]: https://crates.io/crates/riz
 [docs-badge]: https://docs.rs/riz/badge.svg
