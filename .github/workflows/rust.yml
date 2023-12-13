@@ -25,26 +25,21 @@ jobs:
   test:
     name: Test Suite
     runs-on: ubuntu-latest
+    container:
+      image: xd009642/tarpaulin:develop-nightly
+      options: --security-opt seccomp=unconfined
     steps:
-      - name: Checkout sources
+      - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
+      - name: Run tests with coverage
+        run: |
+          cargo +nightly tarpaulin --doc --tests --out xml
 
-      - name: Run cargo test
-        uses: actions-rs/cargo@v1
+      - name: Upload to codecov.io
+        uses: codecov/codecov-action@v2
         with:
-          command: test
-
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v3
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
 
   lints:
     name: Lints
