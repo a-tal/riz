@@ -15,7 +15,7 @@ log = "0.4.20"
 env_logger = "0.10.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-serde_with = "1.14.0"
+serde_with = "3.4.0"
 utoipa = { version = "4.1.0", features = ["actix_extras", "uuid", "debug"] }
 utoipa-swagger-ui = { version = "5", features = ["actix-web"] }
 uuid = { version = "1.6.1", features = ["v4", "fast-rng", "serde", "macro-diagnostics"] }
