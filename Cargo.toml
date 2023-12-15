@@ -1,6 +1,6 @@
 [package]
 name = "riz"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Adam Talsma <adam@talsma.ca>"]
 description = "Wiz lights API and CLI"
 keywords = ["wiz", "lights", "iot"]
@@ -11,6 +11,7 @@ rust-version = "1.68"
 
 [dependencies]
 actix-web = "4.4.0"
+thiserror = "1.0"
 log = "0.4.20"
 env_logger = "0.10.0"
 serde = { version = "1.0", features = ["derive"] }
@@ -24,3 +25,7 @@ strum = "0.25"
 strum_macros = "0.25"
 convert_case = "0.6.0"
 actix-cors = "0.6.5"
+ipnet = "2.9.0"
+
+[dev-dependencies]
+rand = "0.8"

@@ -1,9 +1,13 @@
-use std::{error::Error, net::Ipv4Addr, str::FromStr};
+use std::{net::Ipv4Addr, str::FromStr};
 
 use clap::Parser;
 use convert_case::{Case, Casing};
-use riz::models::{
-    Brightness, Color, Kelvin, Light, LightingResponse, Payload, PowerMode, SceneMode, Speed, White,
+use riz::{
+    models::{
+        Brightness, Color, Kelvin, Light, LightingResponse, Payload, PowerMode, SceneMode, Speed,
+        White,
+    },
+    Result,
 };
 use strum::IntoEnumIterator;
 
@@ -73,7 +77,7 @@ fn print_scenes() {
     }
 }
 
-fn print_response(res: Result<LightingResponse, Box<dyn Error>>) {
+fn print_response(res: Result<LightingResponse>) {
     if let Err(e) = res {
         eprintln!("Error: {:?}", e);
     }

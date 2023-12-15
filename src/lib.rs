@@ -44,10 +44,14 @@
 
 pub mod models;
 
+mod errors;
 mod routes;
 mod storage;
 mod worker;
 
+pub use errors::Error;
 pub use routes::{health, lights, rooms};
 pub use storage::Storage;
 pub use worker::Worker;
+
+pub type Result<T> = std::result::Result<T, Error>;

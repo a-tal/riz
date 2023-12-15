@@ -900,6 +900,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ipnet"
+version = "2.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f518f335dce6725a761382244631d86cf0ccb2863413590b31338feb467f9c3"
+
+[[package]]
 name = "is-terminal"
 version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1251,19 +1257,22 @@ checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
 
 [[package]]
 name = "riz"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "actix-cors",
  "actix-web",
  "clap",
  "convert_case 0.6.0",
  "env_logger",
+ "ipnet",
  "log",
+ "rand",
  "serde",
  "serde_json",
  "serde_with",
  "strum",
  "strum_macros",
+ "thiserror",
  "utoipa",
  "utoipa-swagger-ui",
  "uuid",

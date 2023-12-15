@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::net::Ipv4Addr;
 use std::sync::{
     mpsc::{self, Sender},
@@ -9,15 +8,17 @@ use std::thread;
 use actix_web::web::Data;
 use log::{error, info};
 
-use crate::models::{Light, LightRequest, LightingResponse, Payload};
-use crate::Storage;
+use crate::{
+    models::{Light, LightRequest, LightingResponse, Payload},
+    Error, Result, Storage,
+};
 
-enum DispatchMessage {
+pub enum DispatchMessage {
     Job((Ipv4Addr, LightRequest, Sender<ReplyMessage>)),
     Shutdown,
 }
 
-enum ReplyMessage {
+pub enum ReplyMessage {
     Reply(LightingResponse),
     Shutdown,
 }
@@ -30,7 +31,7 @@ pub struct Worker {
     reply_thread: Option<thread::JoinHandle<()>>,
 }
 
-fn send_reply(resp: Result<LightingResponse, Box<dyn Error>>, tx: Sender<ReplyMessage>) {
+fn send_reply(resp: Result<LightingResponse>, tx: Sender<ReplyMessage>) {
     match resp {
         Ok(resp) => {
             if let Err(e) = tx.send(ReplyMessage::Reply(resp)) {
@@ -105,9 +106,14 @@ impl Worker {
     ///
     /// The work will be executed in the next available thread
     ///
-    pub fn create_task(&mut self, ip: Ipv4Addr, req: LightRequest) -> Result<(), Box<dyn Error>> {
-        self.tx
-            .send(DispatchMessage::Job((ip, req, self.reply_tx.clone())))?;
+    pub fn create_task(&mut self, ip: Ipv4Addr, req: LightRequest) -> Result<()> {
+        match self
+            .tx
+            .send(DispatchMessage::Job((ip, req, self.reply_tx.clone())))
+        {
+            Ok(_) => {}
+            Err(e) => return Err(Error::Dispatch(e)),
+        }
         Ok(())
     }
 
@@ -119,9 +125,11 @@ impl Worker {
     /// [Data] [Mutex] to write the response to the affected
     /// [Light] and update `rooms.json`
     ///
-    pub fn queue_update(&mut self, resp: LightingResponse) -> Result<(), Box<dyn Error>> {
-        self.reply_tx.send(ReplyMessage::Reply(resp))?;
-        Ok(())
+    pub fn queue_update(&mut self, resp: LightingResponse) -> Result<()> {
+        match self.reply_tx.send(ReplyMessage::Reply(resp)) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(Error::Reply(e)),
+        }
     }
 }
 

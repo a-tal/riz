@@ -1,14 +1,12 @@
 //! Riz models
 
 use std::collections::HashMap;
-use std::error::Error;
-use std::fmt;
-use std::net::Ipv4Addr;
-use std::net::UdpSocket;
+use std::net::{Ipv4Addr, UdpSocket};
+use std::result::Result as StdResult;
 use std::str::FromStr;
 use std::time::Duration;
 
-use log::{debug, error};
+use log::debug;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use strum::IntoEnumIterator;
@@ -16,8 +14,7 @@ use strum_macros::EnumIter;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-/// Return of any lighting modification action
-type SetResponse = Result<LightingResponse, Box<dyn Error>>;
+use crate::{Error, Result};
 
 /// Rooms group lights logically to allow for batched actions
 ///
@@ -30,6 +27,11 @@ pub struct Room {
     name: String,
     #[schema(max_items = 100)]
     lights: Option<HashMap<Uuid, Light>>,
+
+    #[serde(skip)]
+    id: Uuid,
+    #[serde(skip)]
+    linked: bool,
 }
 
 impl Room {
@@ -38,7 +40,24 @@ impl Room {
         Room {
             name: String::from(name),
             lights: None,
+            id: Uuid::new_v4(),
+            linked: false,
         }
+    }
+
+    /// Link the id to this Room for self-reference
+    ///
+    /// Can only be called once
+    ///
+    /// # Panics
+    ///   If called more than once
+    ///
+    pub fn link(&mut self, id: &Uuid) {
+        if self.linked {
+            panic!("refusing to overwrite id!")
+        }
+        self.id = *id;
+        self.linked = true;
     }
 
     /// Ask all bulbs in this room for their current status
@@ -48,7 +67,7 @@ impl Room {
     ///   (unordered) [Vec] of [LightingResponse] from all bulbs on success
     ///   and [Error] if there's any error getting status from any bulb
     ///
-    pub fn get_status(&mut self) -> Result<Vec<LightingResponse>, Box<dyn Error>> {
+    pub fn get_status(&mut self) -> Result<Vec<LightingResponse>> {
         let mut resp = Vec::new();
         if let Some(lights) = &mut self.lights {
             for light in lights.values_mut() {
@@ -66,7 +85,8 @@ impl Room {
     /// # Returns
     ///   the newly created [Uuid] for the [Light]
     ///
-    pub fn new_light(&mut self, light: Light) -> Uuid {
+    pub fn new_light(&mut self, light: Light) -> Result<Uuid> {
+        self.validate_light(&light, None)?;
         let mut id = Uuid::new_v4();
         if let Some(lights) = self.lights.as_mut() {
             while lights.contains_key(&id) {
@@ -76,7 +96,7 @@ impl Room {
         } else {
             self.lights = Some(HashMap::from([(id, light)]));
         }
-        id
+        Ok(id)
     }
 
     /// Removes a light from the room's lights
@@ -84,14 +104,14 @@ impl Room {
     /// # Returns
     ///   [Err] [String] when unable to find the light ID or no lights
     ///
-    pub fn delete_light(&mut self, light: &Uuid) -> Result<(), String> {
+    pub fn delete_light(&mut self, light: &Uuid) -> Result<()> {
         if let Some(lights) = self.lights.as_mut() {
             match lights.remove(light) {
                 Some(_) => Ok(()),
-                None => Err(format!("No such light: {}", light)),
+                None => Err(Error::light_not_found(&self.id, light)),
             }
         } else {
-            Err(format!("No lights in room: {}", self.name))
+            Err(Error::RoomNotFound(self.id))
         }
     }
 
@@ -110,7 +130,7 @@ impl Room {
     /// let mut room = Room::new("test");
     ///
     /// let light = Light::new(ip1, Some("foo"));
-    /// let light_id = room.new_light(light);
+    /// let light_id = room.new_light(light).unwrap();
     ///
     /// let read = room.read(&light_id).unwrap();
     /// assert_eq!(read.name(), Some("foo"));
@@ -126,20 +146,20 @@ impl Room {
     /// # Returns
     ///   [Err] [String] if either room or light id is not known
     ///
-    pub fn update_light(&mut self, id: &Uuid, light: &Light) -> Result<(), String> {
+    pub fn update_light(&mut self, id: &Uuid, light: &Light) -> Result<()> {
         if let Some(lights) = self.lights.as_mut() {
             match lights.get_mut(id) {
                 Some(l) => {
                     if l.update(light) {
                         Ok(())
                     } else {
-                        Err(format!("No update found (matching data): {}", id))
+                        Err(Error::no_change_light(&self.id, id))
                     }
                 }
-                None => Err(format!("No such light: {}", id)),
+                None => Err(Error::light_not_found(&self.id, id)),
             }
         } else {
-            Err(format!("No lights in room: {}", self.name))
+            Err(Error::NoLights(self.id))
         }
     }
 
@@ -159,7 +179,7 @@ impl Room {
     /// assert!(room.list().is_none());
     ///
     /// let light = Light::new(Ipv4Addr::from_str("10.1.2.3").unwrap(), None);
-    /// let light_id = room.new_light(light);
+    /// let light_id = room.new_light(light).unwrap();
     ///
     /// let ids = room.list().unwrap();
     /// assert_eq!(*ids.iter().next().unwrap(), &light_id);
@@ -235,6 +255,21 @@ impl Room {
         self.name = other.name.clone();
         true
     }
+
+    fn validate_light(&self, light: &Light, light_id: Option<&Uuid>) -> Result<()> {
+        let ip = light.ip();
+        if let Some(lights) = self.lights.as_ref() {
+            for (id, known) in lights {
+                if Some(id) == light_id {
+                    continue;
+                }
+                if known.ip() == ip {
+                    return Err(Error::invalid_ip(&ip, "already known"));
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Lights are grouped per room, or used individually by the CLI
@@ -306,9 +341,13 @@ impl Light {
     /// If you want to update the last known state, you can pass the
     /// newly fetched status into [Self::process_reply]
     ///
-    pub fn get_status(&self) -> Result<LightStatus, Box<dyn Error>> {
+    pub fn get_status(&self) -> Result<LightStatus> {
         let resp = self.udp_response(&json!({"method": "getPilot"}))?;
-        let status: BulbStatus = serde_json::from_value(resp)?;
+
+        let status: BulbStatus = match serde_json::from_value(resp) {
+            Ok(v) => v,
+            Err(e) => return Err(Error::JsonLoad(e)),
+        };
         let status = LightStatus::from(&status);
         Ok(status)
     }
@@ -318,7 +357,7 @@ impl Light {
     /// Does not update self.status, you can pass the response back
     /// into [Self::process_reply] if you want to update the internal state
     ///
-    pub fn set(&self, payload: &Payload) -> SetResponse {
+    pub fn set(&self, payload: &Payload) -> Result<LightingResponse> {
         if payload.is_valid() {
             match serde_json::to_value(payload) {
                 Ok(msg) => match self.udp_response(&json!({
@@ -326,21 +365,15 @@ impl Light {
                   "params": msg,
                 })) {
                     Ok(v) => {
-                        debug!("{:?} response: {:?}", msg, v);
+                        debug!("udp response: {:?}", v);
                         Ok(LightingResponse::payload(self.ip, payload.clone()))
                     }
-                    Err(e) => {
-                        error!("{:?} error: {:?}", msg, e);
-                        Err(e)
-                    }
+                    Err(e) => Err(e),
                 },
-                Err(e) => {
-                    error!("Failed to dump msg JSON: {:?}", e);
-                    Err(Box::new(e))
-                }
+                Err(e) => Err(Error::JsonDump(e)),
             }
         } else {
-            Err(Box::new(NoAttributeError {}))
+            Err(Error::NoAttribute)
         }
     }
 
@@ -350,7 +383,7 @@ impl Light {
     /// mutate internal state. You can pass the response from this method
     /// to [Self::process_reply] if you want to update this bulb's status
     ///
-    pub fn set_power(&self, power: &PowerMode) -> SetResponse {
+    pub fn set_power(&self, power: &PowerMode) -> Result<LightingResponse> {
         match power {
             PowerMode::On => self.toggle_power(true),
             PowerMode::Off => self.toggle_power(false),
@@ -358,7 +391,7 @@ impl Light {
         }
     }
 
-    fn toggle_power(&self, powered: bool) -> SetResponse {
+    fn toggle_power(&self, powered: bool) -> Result<LightingResponse> {
         self.udp_response(&json!({"method": "setState","params": { "state": powered }}))?;
         Ok(if powered {
             LightingResponse::power(self.ip, PowerMode::On)
@@ -367,7 +400,7 @@ impl Light {
         })
     }
 
-    fn power_cycle(&self) -> SetResponse {
+    fn power_cycle(&self) -> Result<LightingResponse> {
         self.udp_response(&json!({"method": "reboot"}))?;
         Ok(LightingResponse::power(self.ip, PowerMode::Reboot))
     }
@@ -426,35 +459,60 @@ impl Light {
         }
     }
 
-    fn udp_response(&self, msg: &Value) -> Result<Value, Box<dyn Error>> {
+    fn udp_response(&self, msg: &Value) -> Result<Value> {
         // dump the control message to string
-        let msg = serde_json::to_string(&msg)?;
+        let msg = match serde_json::to_string(&msg) {
+            Ok(v) => v,
+            Err(e) => return Err(Error::JsonDump(e)),
+        };
 
         // get some udp socket from the os
-        let socket = UdpSocket::bind("0.0.0.0:0")?;
+        let socket = match UdpSocket::bind("0.0.0.0:0") {
+            Ok(s) => s,
+            Err(e) => return Err(Error::socket("bind", e)),
+        };
 
         // set a 1 second read and write timeout
-        socket.set_write_timeout(Some(Duration::new(1, 0)))?;
-        socket.set_read_timeout(Some(Duration::new(1, 0)))?;
+        match socket.set_write_timeout(Some(Duration::new(1, 0))) {
+            Ok(_) => {}
+            Err(e) => return Err(Error::socket("set_write_timeout", e)),
+        };
+
+        match socket.set_read_timeout(Some(Duration::new(1, 0))) {
+            Ok(_) => {}
+            Err(e) => return Err(Error::socket("set_read_timeout", e)),
+        };
 
         // connect to the remote bulb at their standard port
-        socket.connect(format!("{}:38899", self.ip))?;
+        match socket.connect(format!("{}:38899", self.ip)) {
+            Ok(_) => {}
+            Err(e) => return Err(Error::socket("connect", e)),
+        }
 
         // send the control message
-        socket.send(msg.as_bytes())?;
+        match socket.send(msg.as_bytes()) {
+            Ok(_) => {}
+            Err(e) => return Err(Error::socket("send", e)),
+        };
 
         // declare a buffer of the max message size
         let mut buffer = [0; 4096];
-
-        let bytes = socket.recv(&mut buffer)?;
+        let bytes = match socket.recv(&mut buffer) {
+            Ok(b) => b,
+            Err(e) => return Err(Error::socket("receive", e)),
+        };
 
         // Redeclare `buffer` as String of the received bytes
-        let buffer = String::from_utf8(buffer[..bytes].to_vec())?;
+        let buffer = match String::from_utf8(buffer[..bytes].to_vec()) {
+            Ok(s) => s,
+            Err(e) => return Err(Error::Utf8Decode(e)),
+        };
 
         // create some JSON object from the string
-        let v: Value = serde_json::from_str(&buffer)?;
-
-        Ok(v)
+        match serde_json::from_str(&buffer) {
+            Ok(v) => Ok(v),
+            Err(e) => Err(Error::JsonLoad(e)),
+        }
     }
 }
 
@@ -773,7 +831,7 @@ impl FromStr for Color {
     /// );
     /// ```
     ///
-    fn from_str(s: &str) -> Result<Self, String> {
+    fn from_str(s: &str) -> StdResult<Self, String> {
         let parts: Vec<_> = s.split(',').map(|c| c.parse::<u8>().unwrap_or(0)).collect();
 
         if parts.len() == 3 {
@@ -1611,17 +1669,5 @@ impl From<&Brightness> for Payload {
         let mut p = Payload::new();
         p.brightness(brightness);
         p
-    }
-}
-
-/// Attempting to use [Light::set] with no attributes set in [Payload]
-#[derive(Debug)]
-pub struct NoAttributeError {}
-
-impl Error for NoAttributeError {}
-
-impl fmt::Display for NoAttributeError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Invalid payload; no attributes set")
     }
 }
