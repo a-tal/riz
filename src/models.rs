@@ -252,7 +252,7 @@ impl Room {
         if self.name == other.name {
             return false;
         }
-        self.name = other.name.clone();
+        self.name.clone_from(&other.name);
         true
     }
 
@@ -409,7 +409,7 @@ impl Light {
     fn update(&mut self, other: &Self) -> bool {
         let mut any_update = false;
         if self.name != other.name {
-            self.name = other.name.clone();
+            self.name.clone_from(&other.name);
             any_update = true;
         }
 
@@ -1098,7 +1098,7 @@ impl LightStatus {
             self.brightness = Some(brightness.clone());
         }
         self.emitting = other.emitting;
-        self.scene = other.scene.clone();
+        self.scene.clone_from(&other.scene);
         if let Some(speed) = &other.speed {
             self.speed = Some(speed.clone());
         }
